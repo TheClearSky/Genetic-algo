@@ -4,12 +4,15 @@
 #include <ctime>
 #include <string>
 #include <algorithm>
+#include <utility>
 
 using std::cout;
 using std::cin;
 using std::vector;
 using std::string;
 using std::max;
+using std::pair;
+using std::sort;
 
 void initializerandom() //initializes getrandom with time seed
 {
@@ -50,6 +53,8 @@ void printinbox(const string message)
 //a solution of the problem
 class Solution{
     
+    int id;
+    static int count;
     int numberoftasks;
     int numberofprocessors;
     vector<int> chromosome;
@@ -61,12 +66,17 @@ class Solution{
     int rightspacing=1;
 
     public:
-    Solution(int totaltasks,int totalprocessors,int leftspace=1,int rightspace=1)
+    void init(const int &totaltasks,const int &totalprocessors,const int &leftspace=1,const int &rightspace=1)
     {
+        id=count++;
         leftspacing=leftspace;
         rightspacing=rightspace;
         numberoftasks=totaltasks;
         numberofprocessors=totalprocessors;
+    }
+    Solution(const int &totaltasks,const int &totalprocessors,const int &leftspace=1,const int &rightspace=1)
+    {
+        init(totaltasks,totalprocessors,leftspace,rightspace);
         chromosome.resize(numberoftasks);
         maxcellwidth.resize(numberoftasks);
         int i=1;
@@ -77,8 +87,21 @@ class Solution{
             ++i;
         }
     }
+    Solution(const int &totaltasks,const int &totalprocessors,vector<int> &inchromosome,const int &leftspace=1,const int &rightspace=1)
+    {
+        init(totaltasks,totalprocessors,leftspace,rightspace);
+        chromosome=std::move(inchromosome);
+        maxcellwidth.resize(numberoftasks);
+        int i=1;
+        for(auto &gene:chromosome)
+        {
+            maxcellwidth[i-1]=digitsinint(max(i,gene));
+            ++i;
+        }
+    }
     void printchromosome()
     {
+        printinbox("Solution "+std::to_string(id));
         //line 1
         printrepeatingchars('-',max(label1.length(),label2.length()));
         cout<<'+';
@@ -126,7 +149,26 @@ class Solution{
     {
         return chromosome[taskindex-1];
     }
+    int getid()
+    {
+        return id;
+    }
+    Solution crossover(Solution &sol)
+    {
+        int crossoverindex=getrandom(1,numberoftasks-1);
+        vector<int> childchromosome(numberoftasks,0);
+        for(int i=0;i<crossoverindex;++i)
+        {
+            childchromosome[i]=chromosome[i];
+        }
+        for(int i=crossoverindex;i<numberoftasks;++i)
+        {
+            childchromosome[i]=sol.getandsetprocessorassigned(i+1);
+        }
+        return Solution(numberoftasks,numberofprocessors,childchromosome,leftspacing,rightspacing);
+    }
 };
+int Solution::count=1;
 class Evaluator{
     vector<vector<int>> processortimematrix;
     int numberoftasks;
@@ -140,6 +182,7 @@ class Evaluator{
     int maxsizeoflabels;
     
     vector<vector<int>> lastevaluation;//for previous evaluation
+    vector<int> releasetimes;
     int lastevaluationreleasetime=-1;
 
     vector<int> previousevalmaxcellwidth;
@@ -176,9 +219,10 @@ class Evaluator{
         int maxsizeof2ndlabel=restlabel.length()+digitsinint(numberofprocessors)+1;
         maxsizeoflabels=max(static_cast<int>(indexlabel.length()),maxsizeof2ndlabel);
     }
-    int evaluate(Solution sol)
+    int evaluate(Solution &sol)
     {
-        vector<int> releasetimes(numberofprocessors);
+        releasetimes.clear();
+        releasetimes.resize(numberofprocessors);
         lastevaluation.clear();
         lastevaluation.resize(numberofprocessors);
         previousevalmaxcellwidth.clear();
@@ -212,6 +256,30 @@ class Evaluator{
         
         lastevaluationreleasetime=maxtime;
         return maxtime;
+    }
+    void mutatesolution(Solution &sol)
+    {
+        evaluate(sol);
+        int currmin=releasetimes[0];
+        int minindex=0;
+        int currmax=currmin;
+        int maxindex=0;
+        for(int i=0;i<numberofprocessors;++i)
+        {
+            if(releasetimes[i]>currmax)
+            {
+                currmax=releasetimes[i];
+                maxindex=i;
+            }
+            if(releasetimes[i]<currmin)
+            {
+                currmin=releasetimes[i];
+                minindex=i;
+            }
+        }
+        int maxtasknumber=lastevaluation[maxindex][lastevaluation[maxindex].size()-1];
+        sol.getandsetprocessorassigned(maxtasknumber)=minindex+1;
+        
     }
     void printlastevaluation()
     {
@@ -318,28 +386,68 @@ class Evaluator{
 int main()
 {
     initializerandom();
-    int numberoftasks=12;
-    int numberofprocessors=4;
+    int numberoftasks=500;
+    int numberofprocessors=25;
+    int minprocessingtime=2;
+    int maxprocessingtime=10000;
     
-    int maxpopulationsize=20;
-    int selectionsize=10;
+    Evaluator eval(numberoftasks,numberofprocessors,minprocessingtime,maxprocessingtime);
+    printinbox("Execution Time matrix");
+    // eval.printprocesstimes();
+    
+    int maxpopulationsize=2000;
+    int selectionsize=500;
+    int numberofgenerations=200;
 
-    vector<Solution> population;
+    vector<pair<Solution,int>> populationandfitness;
     for(int i=0;i<maxpopulationsize;++i)
     {
-        population.push_back(Solution(numberoftasks,numberofprocessors));
+        populationandfitness.push_back({Solution(numberoftasks,numberofprocessors),0});
     }
 
     printinbox("Initial Generation");
-    int i=1;
-    for(auto &sol:population)
+    for(int i=1;i<=numberofgenerations;++i)
     {
-        string message="Solution ";
-        printinbox(message+std::to_string(i));
-        sol.printchromosome();
-        ++i;
+        printinbox("Generation "+std::to_string(i));
+        for(auto &sol:populationandfitness)
+        {
+            // sol.first.printchromosome();
+            // printinbox("Fitness Evaluation");
+            sol.second=eval.evaluate(sol.first);
+            // eval.printlastevaluation();
+        }
+        sort(populationandfitness.begin(),populationandfitness.end(),[](const auto& a, const auto& b) -> bool
+        {
+            return a.second < b.second;
+        });
+        printinbox("Solutions selected");
+        for(int j=0;j<selectionsize;++j)
+        {
+            cout<<"Solution "<<populationandfitness[j].first.getid()<<"\tRelease Time:"<<populationandfitness[j].second<<'\n';
+        }
+        
+        printinbox("Generating Children by Crossover and Mutation");
+        for(int j=selectionsize;j<maxpopulationsize;++j)
+        {
+            if(selectionsize<2)
+            {
+                break;
+            }
+            int select1=getrandom(0,selectionsize-1);
+            int select2=getrandom(0,selectionsize-1);
+            while(select2==select1)
+            {
+                select2=getrandom(0,selectionsize-1);
+            }
+            auto &parent1=populationandfitness[select1].first;
+            auto &parent2=populationandfitness[select2].first;
+            populationandfitness[j].first=parent1.crossover(parent2);
+            // printinbox("After crossing "+std::to_string(parent1.getid())+"with"+std::to_string(parent2.getid()));
+            // populationandfitness[j].first.printchromosome();
+            eval.mutatesolution(populationandfitness[j].first);
+            // printinbox("After mutation");
+            // populationandfitness[j].first.printchromosome();
+        }
     }
-    
-
     return 0;
 }
