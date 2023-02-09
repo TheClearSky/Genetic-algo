@@ -41,31 +41,49 @@ int digitsinint(int num) // how many digits are in num
     }
     return ans;
 }
-void printinbox(const string message)
+
+//prints the message in a box in the below format
+//+-------+
+//|message|
+//+-------+
+void printinbox(const string message,int spacefromleft=0)
 {
+    //line 1
+    printrepeatingchars(' ',spacefromleft);
     cout<<'+';
     printrepeatingchars('-',message.length());
-    cout<<"+\n|"<<message<<"|\n+";
+    cout<<"+\n";
+
+    //line 2
+    printrepeatingchars(' ',spacefromleft);
+    cout<<'|'<<message<<"|\n";
+    
+    //line 3
+    printrepeatingchars(' ',spacefromleft);
+    cout<<'+';
     printrepeatingchars('-',message.length());
     cout<<"+\n";
 }
 
-//a solution of the problem
+//a valid solution of the problem
 class Solution{
     
-    int id;
-    static int count;
-    int numberoftasks;
+    int id; //solution id
+    static int count; //total number of solutions generated till now
+    int numberoftasks; 
     int numberofprocessors;
     vector<int> chromosome;
 
-    vector<int> maxcellwidth; //for UI
-    string label1="Tasks:";
-    string label2="Processors:";
-    int leftspacing=1;
-    int rightspacing=1;
+    //following variables are needed for printing 
+    vector<int> maxcellwidth; //max width of ith cell in the chromosome table
+    string label1="Tasks:";  //name of row 1 in chromosome table
+    string label2="Processors:"; //name of row 2 in chromosome table
+    int leftspacing=1; //left spacing of every cell in chromosome table
+    int rightspacing=1; //right spacing of every cell in chromosome table
 
     public:
+    
+    //initializes the variables needed to build the chromosome and spacing in table
     void init(const int &totaltasks,const int &totalprocessors,const int &leftspace=1,const int &rightspace=1)
     {
         id=count++;
@@ -74,6 +92,8 @@ class Solution{
         numberoftasks=totaltasks;
         numberofprocessors=totalprocessors;
     }
+
+    //constructs a solution and initializes the chromosome with random values between all processors
     Solution(const int &totaltasks,const int &totalprocessors,const int &leftspace=1,const int &rightspace=1)
     {
         init(totaltasks,totalprocessors,leftspace,rightspace);
@@ -82,11 +102,12 @@ class Solution{
         int i=1;
         for(auto &gene:chromosome)
         {
-            gene=getrandom(1,numberofprocessors);
-            maxcellwidth[i-1]=digitsinint(max(i,gene));
+            gene=getrandom(1,numberofprocessors); //every gene gets a random value in range [1,numberofprocessors]
+            maxcellwidth[i-1]=digitsinint(max(i,gene)); //for printing
             ++i;
         }
     }
+
     Solution(const int &totaltasks,const int &totalprocessors,vector<int> &inchromosome,const int &leftspace=1,const int &rightspace=1)
     {
         init(totaltasks,totalprocessors,leftspace,rightspace);
@@ -383,71 +404,499 @@ class Evaluator{
         cout<<'\n';
     }
 };
-int main()
-{
-    initializerandom();
-    int numberoftasks=500;
-    int numberofprocessors=25;
-    int minprocessingtime=2;
-    int maxprocessingtime=10000;
-    
-    Evaluator eval(numberoftasks,numberofprocessors,minprocessingtime,maxprocessingtime);
-    printinbox("Execution Time matrix");
-    // eval.printprocesstimes();
-    
-    int maxpopulationsize=2000;
-    int selectionsize=500;
-    int numberofgenerations=200;
 
-    vector<pair<Solution,int>> populationandfitness;
-    for(int i=0;i<maxpopulationsize;++i)
+class Menu{
+    public:
+    vector<string> options;
+    string menuname;
+
+    Menu(const vector<string> &inoptions,const string inmenuname="Menu"):options{inoptions},menuname{inmenuname}
+    {}
+
+    int startmenuandgetoption()
     {
-        populationandfitness.push_back({Solution(numberoftasks,numberofprocessors),0});
+        int currentselection=0;
+        return startmenuandgetoption(currentselection);
     }
 
-    printinbox("Initial Generation");
-    for(int i=1;i<=numberofgenerations;++i)
+    //returns option number starting from 0 and -1 if exit
+    int startmenuandgetoption(int &currentselection)
     {
-        printinbox("Generation "+std::to_string(i));
+        string input="";
+        while(true)
+        {
+            printrepeatingchars('-',50);
+            cout<<"\n\n";
+            printinbox(menuname,10);
+            cout<<"\n\n";
+            for(int i=0;i<options.size();++i)
+            {
+                if(currentselection==i)
+                {
+                    printinbox(std::to_string(i+1)+". "+options[i]);
+                }
+                else
+                {
+                    cout<<" "<<i+1<<". "<<options[i]<<"\n";
+                    if((i+1)!=(currentselection))
+                    {
+                        cout<<'\n';
+                    }
+                }
+            }
+            cout<<"Press u and enter to move selection up\n";
+            cout<<"Press d and enter to move selection down\n";
+            cout<<"Type an option number and enter to select that option\n";
+            cout<<"Type ok to confirm current selection\n";
+            cout<<"Type exit and enter to exit\n";
+            bool isoutputvalid;
+            do
+            {
+                isoutputvalid=true;
+                cin>>input;
+                transform(input.begin(), input.end(), input.begin(), ::tolower);
+                if(input=="exit")
+                {
+                    return -1;
+                }
+                if(input=="u")
+                {
+                    if(currentselection>0)
+                    {
+                        --currentselection;
+                    }
+                }
+                else if(input=="d")
+                {
+                    if(currentselection<options.size()-1)
+                    {
+                        ++currentselection;
+                    }
+                }
+                else if(input=="ok")
+                {
+                    return currentselection;
+                }
+                else
+                {
+                    try
+                    {
+                        int optionnumber=std::stoi(input);
+                        --optionnumber;
+                        if((optionnumber<0)||(optionnumber>=options.size()))
+                        {
+                            cout<<"Invalid option number,Try again\n";
+                            isoutputvalid=false;
+                        }
+                        else
+                        {
+                            currentselection=optionnumber;
+                        }
+                    }
+                    catch(const std::exception& e)
+                    {
+                        cout<<"Invalid input,Try again\n";
+                        isoutputvalid=false;
+                    }
+                }
+            }while(!isoutputvalid);
+            printrepeatingchars('\n',3);
+        }
+        return -1;
+    }
+};
+
+//settings for the running of Genetic algo
+class Settings{
+    public:
+    int numberoftasks=12;
+    int numberofprocessors=4;
+    int minprocessingtime=20;
+    int maxprocessingtime=100;
+
+    int maxpopulationsize=10;
+    int selectionsize=5;
+    int numberofgenerations=2;
+
+    //UI Settings
+    bool notifyinitialization=true;
+    bool printexecutionmatrix=true;
+    bool printcurrentgeneration=true;
+    bool printcurrentevaluation=true;
+    bool printselection=true;
+    bool printcrossoverandmutation=true;
+    int samplesizetoprint=2;
+
+    void turnoffallprinting()
+    {
+        notifyinitialization=false;
+        printexecutionmatrix=false;
+        printcurrentgeneration=false;
+        printcurrentevaluation=false;
+        printselection=false;
+        printcrossoverandmutation=false;
+    }
+    void turnonallprinting()
+    {
+        notifyinitialization=true;
+        printexecutionmatrix=true;
+        printcurrentgeneration=true;
+        printcurrentevaluation=true;
+        printselection=true;
+        printcrossoverandmutation=true;
+    }
+};
+class AlgorithmManager{
+    vector<pair<Solution,int>> populationandfitness;
+    Settings settings;
+    Evaluator eval;
+    static int generationnumber;
+    public:
+    AlgorithmManager():settings(),eval(settings.numberoftasks,settings.numberofprocessors,settings.minprocessingtime,settings.maxprocessingtime)
+    {
+    }
+    AlgorithmManager(Settings &customsettings):settings{customsettings},eval(settings.numberoftasks,settings.numberofprocessors,settings.minprocessingtime,settings.maxprocessingtime)
+    {
+    }
+    void printexecutionmatrix()
+    {
+        printinbox("Execution Time matrix");
+        eval.printprocesstimes();
+    }
+    void generateinitialpopulation()
+    {
+        if(settings.printexecutionmatrix)
+        {
+            printexecutionmatrix();
+        }
+        if(settings.notifyinitialization)
+        {
+            printinbox("Initial Population Generated");
+        }
+        populationandfitness.clear();
+        for(int i=0;i<settings.maxpopulationsize;++i)
+        {
+            populationandfitness.push_back({Solution(settings.numberoftasks,settings.numberofprocessors),0});
+        }
+    }
+    void printsamplesfromcurrentgeneration()
+    {
+        if(!settings.printcurrentgeneration) return;
+        if(settings.samplesizetoprint==0) return;
+        printinbox("Generation "+std::to_string(generationnumber));
+        if(settings.samplesizetoprint>settings.maxpopulationsize)
+        {
+            settings.samplesizetoprint=settings.maxpopulationsize;
+        }
+        // int nottoprint=settings.maxpopulationsize-settings.samplesizetoprint;
+        // int increment=(nottoprint/settings.samplesizetoprint)+1;
+        int printed=0;
+        int increment=settings.maxpopulationsize/settings.samplesizetoprint;
+        for(int i=0;printed<settings.samplesizetoprint;i+=increment)
+        {
+            auto &sol=populationandfitness[i];
+            sol.first.printchromosome();
+            ++printed;
+            if(settings.printcurrentevaluation)
+            {
+                sol.second=eval.evaluate(sol.first);
+                printinbox("Fitness Evaluation");
+                eval.printlastevaluation();
+            }
+        }
+    }
+    void evaluateall()
+    {
         for(auto &sol:populationandfitness)
         {
-            // sol.first.printchromosome();
-            // printinbox("Fitness Evaluation");
             sol.second=eval.evaluate(sol.first);
-            // eval.printlastevaluation();
         }
+    }
+    void select()
+    {
         sort(populationandfitness.begin(),populationandfitness.end(),[](const auto& a, const auto& b) -> bool
         {
             return a.second < b.second;
         });
-        printinbox("Solutions selected");
-        for(int j=0;j<selectionsize;++j)
+        if(settings.selectionsize>settings.maxpopulationsize)
         {
-            cout<<"Solution "<<populationandfitness[j].first.getid()<<"\tRelease Time:"<<populationandfitness[j].second<<'\n';
+            settings.selectionsize=settings.maxpopulationsize;
         }
-        
-        printinbox("Generating Children by Crossover and Mutation");
-        for(int j=selectionsize;j<maxpopulationsize;++j)
+        if(settings.printselection)
         {
-            if(selectionsize<2)
+            printinbox("Solutions selected");
+            for(int j=0;j<settings.selectionsize;++j)
+            {
+                cout<<"Solution "<<populationandfitness[j].first.getid()<<"\tRelease Time:"<<populationandfitness[j].second<<'\n';
+            }
+        }
+    }
+    void crossoverandmutation()
+    {
+        if(settings.printcrossoverandmutation)
+        {
+            printinbox("Generating Children by Crossover and Mutation");
+        }
+        int increment;
+        if(settings.samplesizetoprint!=0)
+        {
+            increment=(settings.maxpopulationsize-settings.selectionsize)/settings.samplesizetoprint;
+        }
+        else
+        {
+            increment=settings.maxpopulationsize+1;
+        }
+        if(increment==0)
+        {
+            increment=1;
+        }
+        int printed=0;
+        for(int j=settings.selectionsize;j<settings.maxpopulationsize;++j)
+        {
+            bool shouldweprinthis=settings.printcrossoverandmutation && ( j % increment == 0) && (printed < settings.samplesizetoprint);
+            if(settings.selectionsize<2)
             {
                 break;
             }
-            int select1=getrandom(0,selectionsize-1);
-            int select2=getrandom(0,selectionsize-1);
+            int select1=getrandom(0,settings.selectionsize-1);
+            int select2=getrandom(0,settings.selectionsize-1);
             while(select2==select1)
             {
-                select2=getrandom(0,selectionsize-1);
+                select2=getrandom(0,settings.selectionsize-1);
             }
             auto &parent1=populationandfitness[select1].first;
             auto &parent2=populationandfitness[select2].first;
             populationandfitness[j].first=parent1.crossover(parent2);
-            // printinbox("After crossing "+std::to_string(parent1.getid())+"with"+std::to_string(parent2.getid()));
-            // populationandfitness[j].first.printchromosome();
+            if(shouldweprinthis)
+            {
+                printinbox("After crossing Solution "+std::to_string(parent1.getid())+" with Solution "+std::to_string(parent2.getid()));
+                parent1.printchromosome();
+                cout<<"    |\n";
+                cout<<"    |\n";
+                cout<<"====+====\n";
+                cout<<"    |\n";
+                cout<<"    |\n";
+                parent2.printchromosome();
+                printinbox("We get");
+                cout<<"   |\n";
+                cout<<"\\  |  /\n";
+                cout<<" \\ | /\n";
+                cout<<"  \\|/\n";
+                populationandfitness[j].first.printchromosome();
+            }
             eval.mutatesolution(populationandfitness[j].first);
-            // printinbox("After mutation");
-            // populationandfitness[j].first.printchromosome();
+            if(shouldweprinthis)
+            {
+                printinbox("After mutation");
+                populationandfitness[j].first.printchromosome();
+                ++printed;
+            }
         }
     }
+    void calculatenextgeneration()
+    {
+        if(settings.printcurrentgeneration)
+        {
+            printsamplesfromcurrentgeneration();
+        }
+        evaluateall();
+        select();
+        crossoverandmutation();
+    }
+    void runforgenerations(int numberofgenerations)
+    {
+        while(numberofgenerations--)
+        {
+            calculatenextgeneration();
+        }
+    }
+    int changealgorithmsettings()
+    {
+        Menu menu({},"Change algorithm settings");
+        int boxselection=0;
+        while(true)
+        {
+            vector<string> newoptions{
+            "Back",
+            "Number Of Tasks:"+std::to_string(settings.numberoftasks),
+            "Number Of Processors:"+std::to_string(settings.numberofprocessors),
+            "Minimum Processing Time:"+std::to_string(settings.minprocessingtime),
+            "Maximum Processing Time:"+std::to_string(settings.maxprocessingtime),
+            "Maximum Population Size:"+std::to_string(settings.maxpopulationsize),
+            "Selection Size:"+std::to_string(settings.selectionsize),
+            "Number Of Generations:"+std::to_string(settings.numberofgenerations),
+            };
+            menu.options=newoptions;
+            int selection= menu.startmenuandgetoption(boxselection);
+            if(selection<=0)
+            {
+                return selection;
+            }
+            cout<<"Enter new value:";
+            switch (selection)
+            {
+            case 1:
+                cin>>settings.numberoftasks;
+                break;
+            case 2:
+                cin>>settings.numberofprocessors;
+                break;
+            case 3:
+                cin>>settings.minprocessingtime;
+                break;
+            case 4:
+                cin>>settings.maxprocessingtime;
+                break;
+            case 5:
+                cin>>settings.maxpopulationsize;
+                break;
+            case 6:
+                cin>>settings.selectionsize;
+                break;
+            case 7:
+                cin>>settings.numberofgenerations;
+                break;
+            
+
+            default:
+                return 0;
+            }
+        }
+        return 0;
+    }
+    int changealgorithmdisplaysettings()
+    {
+        Menu menu({},"Change algorithm display settings");
+        string yes("Yes"),no("No");
+        int boxselection=0;
+        while(true)
+        {
+            vector<string> newoptions{
+            "Back",
+            "(Toggle) Notify when Initial Population is Created:"+(settings.notifyinitialization?yes:no),
+            "(Toggle) Print Execution Matrix:"+(settings.printexecutionmatrix?yes:no),
+            "(Toggle) Print Current Generation:"+(settings.printcurrentgeneration?yes:no),
+            "(Toggle) Print Current Evaluation:"+(settings.printcurrentevaluation?yes:no),
+            "(Toggle) Print Selection:"+(settings.printselection?yes:no),
+            "(Toggle) Print Crossover and Mutation:"+(settings.printcrossoverandmutation?yes:no),
+            "Sample size to print:"+std::to_string(settings.samplesizetoprint),
+            "Turn off all printing",
+            "Turn on all printing"
+            };
+            menu.options=newoptions;
+            int selection= menu.startmenuandgetoption(boxselection);
+            switch (selection)
+            {
+            case -1:
+                return -1;
+            case 1:
+                settings.notifyinitialization=(!settings.notifyinitialization);
+                break;
+            case 2:
+                settings.printexecutionmatrix=(!settings.printexecutionmatrix);
+                break;
+            case 3:
+                settings.printcurrentgeneration=(!settings.printcurrentgeneration);
+                break;
+            case 4:
+                settings.printcurrentevaluation=(!settings.printcurrentevaluation);
+                break;
+            case 5:
+                settings.printselection=(!settings.printselection);
+                break;
+            case 6:
+                settings.printcrossoverandmutation=(!settings.printcrossoverandmutation);
+                break;
+            case 7:
+                cout<<"Enter new value:\n";
+                cin>>settings.samplesizetoprint;
+                break;
+            case 8:
+                settings.turnoffallprinting();
+                break;
+            case 9:
+                settings.turnonallprinting();
+                break;
+
+            default:
+                return 0;
+            }
+        }
+        return 0;
+    }
+    int startnewrun()
+    {
+        generateinitialpopulation();
+        Menu menu({"Back","Run for more generations","Change population size"});
+        int boxselection=0;
+        int generationstorun=settings.numberofgenerations;
+        while(true)
+        {
+            runforgenerations(settings.numberofgenerations);
+            menu.menuname="Ran for "+std::to_string(generationstorun)+" generations";
+            int selection= menu.startmenuandgetoption(boxselection);
+            switch (selection)
+            {
+            case -1:
+                return -1;
+            case 0:
+                return 0;
+            case 1:
+                cout<<"How many generations to run?\n";
+                cin>>generationstorun;
+                break;
+            case 2:
+                
+                break;
+
+            default:
+                return 0;
+            }
+        }
+        return 0;
+    }
+    void mainmenu()
+    {
+        Menu menu({"Change algorithm settings","Change algorithm display settings","Start new run","Exit"},"Main Menu");
+        int boxselection=0;
+        while(true)
+        {
+            int selection= menu.startmenuandgetoption(boxselection);
+            switch (selection)
+            {
+            case 0:
+                if(changealgorithmsettings()==-1)
+                {
+                    return;
+                }
+                break;
+            case 1:
+                if(changealgorithmdisplaysettings()==-1)
+                {
+                    return;
+                }
+                break;
+            case 2:
+                if(startnewrun()==-1)
+                {
+                    return;
+                }
+                break;
+            case 3:
+                return;
+                
+            default:
+                return;
+            }
+        }
+    }
+};
+int AlgorithmManager::generationnumber=1;
+int main()
+{
+    initializerandom();
+    Settings settings;
+    AlgorithmManager a(settings);
+    a.mainmenu();
     return 0;
 }
