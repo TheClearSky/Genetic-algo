@@ -5,6 +5,7 @@
 #include <string>
 #include <algorithm>
 #include <utility>
+#include <numeric>
 
 using std::cout;
 using std::cin;
@@ -425,6 +426,11 @@ class Menu{
         string input="";
         while(true)
         {
+            if(std::cin.fail())
+            {
+                cin.clear();
+                cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
+            }
             printrepeatingchars('-',50);
             cout<<"\n\n";
             printinbox(menuname,10);
@@ -737,15 +743,19 @@ class AlgorithmManager{
             {
             case 1:
                 cin>>settings.numberoftasks;
+                eval=Evaluator(settings.numberoftasks,settings.numberofprocessors,settings.minprocessingtime,settings.maxprocessingtime);
                 break;
             case 2:
                 cin>>settings.numberofprocessors;
+                eval=Evaluator(settings.numberoftasks,settings.numberofprocessors,settings.minprocessingtime,settings.maxprocessingtime);
                 break;
             case 3:
                 cin>>settings.minprocessingtime;
+                eval=Evaluator(settings.numberoftasks,settings.numberofprocessors,settings.minprocessingtime,settings.maxprocessingtime);
                 break;
             case 4:
                 cin>>settings.maxprocessingtime;
+                eval=Evaluator(settings.numberoftasks,settings.numberofprocessors,settings.minprocessingtime,settings.maxprocessingtime);
                 break;
             case 5:
                 cin>>settings.maxpopulationsize;
@@ -827,15 +837,15 @@ class AlgorithmManager{
     int startnewrun()
     {
         generateinitialpopulation();
-        Menu menu({"Back","Run for more generations","Change population size"});
+        Menu menu({"Back","Run for more generations","Change population size","Change algorithm display settings"});
         int boxselection=0;
         int generationstorun=settings.numberofgenerations;
         
-        // int generationstorun=settings.numberofgenerations;
+        runforgenerations(generationstorun);
+        
+        menu.menuname="Ran for "+std::to_string(generationstorun)+" generations";
         while(true)
         {
-            runforgenerations(generationstorun);
-            menu.menuname="Ran for "+std::to_string(generationstorun)+" generations";
             int selection= menu.startmenuandgetoption(boxselection);
             switch (selection)
             {
@@ -846,11 +856,25 @@ class AlgorithmManager{
             case 1:
                 cout<<"How many generations to run?\n";
                 cin>>generationstorun;
+                runforgenerations(generationstorun);
+                menu.menuname="Ran for "+std::to_string(generationstorun)+" generations";
                 break;
             case 2:
-                
+                cout<<"Enter new population size(Current:"<<settings.maxpopulationsize<<"):";
+                cin>>settings.maxpopulationsize;
+                cout<<"Enter new selection size less than population size(Current:"<<settings.selectionsize<<"):";
+                cin>>settings.selectionsize;
+                cout<<"Set new population as "<<settings.maxpopulationsize<<"and selection size as "<<settings.selectionsize;
+                populationandfitness.resize(settings.maxpopulationsize,{Solution(settings.numberoftasks,settings.numberofprocessors),0});
+                menu.menuname="Changed population size";
                 break;
-
+            case 3:
+                if(changealgorithmdisplaysettings()==-1)
+                {
+                    return -1;
+                }
+                menu.menuname="Changed display settings";
+                break;
             default:
                 return 0;
             }
