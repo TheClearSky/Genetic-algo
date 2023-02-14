@@ -830,9 +830,11 @@ class AlgorithmManager{
         Menu menu({"Back","Run for more generations","Change population size"});
         int boxselection=0;
         int generationstorun=settings.numberofgenerations;
+        
+        // int generationstorun=settings.numberofgenerations;
         while(true)
         {
-            runforgenerations(settings.numberofgenerations);
+            runforgenerations(generationstorun);
             menu.menuname="Ran for "+std::to_string(generationstorun)+" generations";
             int selection= menu.startmenuandgetoption(boxselection);
             switch (selection)
