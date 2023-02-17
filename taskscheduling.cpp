@@ -4,6 +4,8 @@
 #include <ctime>
 #include <string>
 #include <algorithm>
+#include <random>
+#include <chrono>
 #include <utility>
 #include <numeric>
 
@@ -41,6 +43,12 @@ int digitsinint(int num) // how many digits are in num
         num/=10;
     }
     return ans;
+}
+template<class T> void shufflevector(vector<T> &vec) //shuffles a vector using default random number generator and a time based seed
+{
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+
+    std::shuffle (vec.begin(), vec.end(), std::default_random_engine(seed));
 }
 
 //prints the message in a box in the below format
@@ -512,26 +520,37 @@ class Menu{
     }
 };
 
+enum class SelectionMode{
+    rank,
+    tournament,
+    roulettewheel
+};
+
 //settings for the running of Genetic algo
 class Settings{
     public:
-    int numberoftasks=12;
-    int numberofprocessors=4;
-    int minprocessingtime=20;
-    int maxprocessingtime=100;
+    int numberoftasks=120;
+    int numberofprocessors=20;
+    int minprocessingtime=10;
+    int maxprocessingtime=1000;
 
-    int maxpopulationsize=10;
-    int selectionsize=5;
-    int numberofgenerations=2;
+    int maxpopulationsize=100;
+    int selectionsize=20;
+    int tournamentsize=5;
+    int roulettesize=5;
+    int numberofgenerations=20;
+
+    //for selecting the algorithm of selection step
+    SelectionMode mode{SelectionMode::rank};
 
     //UI Settings
     bool notifyinitialization=true;
-    bool printexecutionmatrix=true;
-    bool printcurrentgeneration=true;
-    bool printcurrentevaluation=true;
+    bool printexecutionmatrix=false;
+    bool printcurrentgeneration=false;
+    bool printcurrentevaluation=false;
     bool printselection=true;
-    bool printcrossoverandmutation=true;
-    int samplesizetoprint=2;
+    bool printcrossoverandmutation=false;
+    int samplesizetoprint=5;
 
     void turnoffallprinting()
     {
@@ -550,6 +569,22 @@ class Settings{
         printcurrentevaluation=true;
         printselection=true;
         printcrossoverandmutation=true;
+    }
+    string getcurrentselectionmode()
+    {
+        switch (mode)
+        {
+        case SelectionMode::rank:
+            return "Rank";
+        case SelectionMode::tournament:
+            return "Tournament";
+        case SelectionMode::roulettewheel:
+            return "Roulette Wheel";
+        
+        default:
+            break;
+        }
+        return "Invalid Selection Mode";
     }
 };
 class AlgorithmManager{
@@ -618,7 +653,18 @@ class AlgorithmManager{
             sol.second=eval.evaluate(sol.first);
         }
     }
-    void select()
+    void printselection()
+    {
+        if(settings.printselection)
+        {
+            printinbox("Solutions selected");
+            for(int j=0;j<settings.selectionsize;++j)
+            {
+                cout<<"Solution "<<populationandfitness[j].first.getid()<<"\tRelease Time:"<<populationandfitness[j].second<<'\n';
+            }
+        }
+    }
+    void selectbyrank()
     {
         sort(populationandfitness.begin(),populationandfitness.end(),[](const auto& a, const auto& b) -> bool
         {
@@ -628,14 +674,65 @@ class AlgorithmManager{
         {
             settings.selectionsize=settings.maxpopulationsize;
         }
-        if(settings.printselection)
+        printselection();
+    }
+    void selectbytournament()
+    {
+        shufflevector(populationandfitness);
+        int insertat=0;
+        int minfitness=INT_MAX;
+        int minfitnessindex=0;
+        for(int i=0;i<settings.maxpopulationsize;++i)
         {
-            printinbox("Solutions selected");
-            for(int j=0;j<settings.selectionsize;++j)
+            if(populationandfitness[i].second<minfitness)
             {
-                cout<<"Solution "<<populationandfitness[j].first.getid()<<"\tRelease Time:"<<populationandfitness[j].second<<'\n';
+                minfitnessindex=i;
+                minfitness=populationandfitness[i].second;
+            }
+            if(((i+1)%settings.tournamentsize==0)||(i==settings.maxpopulationsize-1))
+            {
+                populationandfitness[insertat++]=populationandfitness[minfitnessindex];
+                minfitness=0;
+                minfitness=INT_MAX;
             }
         }
+        printselection();
+    }
+    void selectbyroulettewheel()
+    {
+        shufflevector(populationandfitness);
+        int insertat=0;
+        int fitnesssum=0;
+        vector<int> ranges;
+        ranges.reserve(settings.roulettesize);
+        int chosenindex=0;
+        int totalfitness=0;
+        for(auto &p:populationandfitness)
+        {
+            totalfitness+=p.second;
+        }
+        for(int i=0;i<settings.maxpopulationsize;++i)
+        {
+            fitnesssum+=(totalfitness/populationandfitness[i].second);
+            ranges.push_back(fitnesssum);
+            if(((i+1)%settings.roulettesize==0)||(i==settings.maxpopulationsize-1))
+            {
+                int randomselect=getrandom(0,fitnesssum);
+                for(auto &range:ranges)
+                {
+                    if(randomselect<=range)
+                    {
+                        break;
+                    }
+                    ++chosenindex;
+                }
+                populationandfitness[insertat++]=populationandfitness[chosenindex];
+                ranges.clear();
+                ranges.reserve(settings.roulettesize);
+            }
+        }
+        
+        printselection();
     }
     void crossoverandmutation()
     {
@@ -706,7 +803,23 @@ class AlgorithmManager{
             printsamplesfromcurrentgeneration();
         }
         evaluateall();
-        select();
+        if(settings.mode==SelectionMode::rank)
+        {
+            selectbyrank();
+        }
+        else if(settings.mode==SelectionMode::tournament)
+        {
+            selectbytournament();
+        }
+        else if(settings.mode==SelectionMode::roulettewheel)
+        {
+            selectbyroulettewheel();
+        }
+        else
+        {
+            cout<<"Something went wrong: Invalid selection mode, aborting\n";
+            return;
+        }
         crossoverandmutation();
     }
     void runforgenerations(int numberofgenerations)
@@ -729,7 +842,9 @@ class AlgorithmManager{
             "Minimum Processing Time:"+std::to_string(settings.minprocessingtime),
             "Maximum Processing Time:"+std::to_string(settings.maxprocessingtime),
             "Maximum Population Size:"+std::to_string(settings.maxpopulationsize),
-            "Selection Size:"+std::to_string(settings.selectionsize),
+            "Selection Size:"+std::to_string(settings.selectionsize)+(settings.mode==SelectionMode::rank?" |>Current Mode":" !!Not available in current mode!!"),
+            "Tournament Size(Recalculates selection size):"+std::to_string(settings.tournamentsize)+(settings.mode==SelectionMode::tournament?" |>Current Mode":" !!Not available in current mode!!"),
+            "Roulette Size(Recalculates selection size):"+std::to_string(settings.roulettesize)+(settings.mode==SelectionMode::roulettewheel?" |>Current Mode":" !!Not available in current mode!!"),
             "Number Of Generations:"+std::to_string(settings.numberofgenerations),
             };
             menu.options=newoptions;
@@ -738,32 +853,84 @@ class AlgorithmManager{
             {
                 return selection;
             }
-            cout<<"Enter new value:";
             switch (selection)
             {
             case 1:
+                cout<<"Enter new value:";
                 cin>>settings.numberoftasks;
                 eval=Evaluator(settings.numberoftasks,settings.numberofprocessors,settings.minprocessingtime,settings.maxprocessingtime);
                 break;
             case 2:
+                cout<<"Enter new value:";
                 cin>>settings.numberofprocessors;
                 eval=Evaluator(settings.numberoftasks,settings.numberofprocessors,settings.minprocessingtime,settings.maxprocessingtime);
                 break;
             case 3:
+                cout<<"Enter new value:";
                 cin>>settings.minprocessingtime;
                 eval=Evaluator(settings.numberoftasks,settings.numberofprocessors,settings.minprocessingtime,settings.maxprocessingtime);
                 break;
             case 4:
+                cout<<"Enter new value:";
                 cin>>settings.maxprocessingtime;
                 eval=Evaluator(settings.numberoftasks,settings.numberofprocessors,settings.minprocessingtime,settings.maxprocessingtime);
                 break;
             case 5:
+                cout<<"Enter new value:";
                 cin>>settings.maxpopulationsize;
+                if(settings.mode==SelectionMode::tournament)
+                {
+                    settings.selectionsize=(settings.maxpopulationsize/settings.tournamentsize)+((settings.maxpopulationsize%settings.tournamentsize)!=0);
+                }
+                if(settings.mode==SelectionMode::roulettewheel)
+                {
+                    settings.selectionsize=(settings.maxpopulationsize/settings.roulettesize)+((settings.maxpopulationsize%settings.roulettesize)!=0);
+                }
                 break;
             case 6:
-                cin>>settings.selectionsize;
+                if(settings.mode==SelectionMode::rank)
+                {
+                    cout<<"Enter new value:";
+                    cin>>settings.selectionsize;
+                }
+                else
+                {
+                    cout<<"Not available in this selection mode\n";
+                }
                 break;
             case 7:
+                if(settings.mode==SelectionMode::tournament)
+                {
+                    cout<<"Enter new value:";
+                    cin>>settings.tournamentsize;
+                    if(settings.tournamentsize<=0)
+                    {
+                        settings.tournamentsize=1;
+                    }
+                    settings.selectionsize=(settings.maxpopulationsize/settings.tournamentsize)+((settings.maxpopulationsize%settings.tournamentsize)!=0);
+                }
+                else
+                {
+                    cout<<"Not available in this selection mode\n";
+                }
+                break;
+            case 8:
+                if(settings.mode==SelectionMode::roulettewheel)
+                {
+                    cout<<"Enter new value:";
+                    cin>>settings.roulettesize;
+                    if(settings.roulettesize<=0)
+                    {
+                        settings.roulettesize=1;
+                    }
+                    settings.selectionsize=(settings.maxpopulationsize/settings.roulettesize)+((settings.maxpopulationsize%settings.roulettesize)!=0);
+                }
+                else
+                {
+                    cout<<"Not available in this selection mode\n";
+                }
+                break;
+            case 9:
                 cin>>settings.numberofgenerations;
                 break;
             
@@ -875,6 +1042,43 @@ class AlgorithmManager{
                 }
                 menu.menuname="Changed display settings";
                 break;
+            case 4:
+
+            default:
+                return 0;
+            }
+        }
+        return 0;
+    }
+    int changeselectionmode()
+    {
+        Menu menu({},"Current mode:"+settings.getcurrentselectionmode());
+        string yes("Yes"),no("No");
+        int boxselection=0;
+        while(true)
+        {
+            menu.menuname="Current mode:"+settings.getcurrentselectionmode();
+            menu.options={
+            "Back",
+            "Rank",
+            "Tournament",
+            "Roulette Wheel"
+            };
+            int selection= menu.startmenuandgetoption(boxselection);
+            switch (selection)
+            {
+            case -1:
+                return -1;
+            case 1:
+                settings.mode=SelectionMode::rank;
+                break;
+            case 2:
+                settings.mode=SelectionMode::tournament;
+                break;
+            case 3:
+                settings.mode=SelectionMode::roulettewheel;
+                break;
+
             default:
                 return 0;
             }
@@ -883,7 +1087,7 @@ class AlgorithmManager{
     }
     void mainmenu()
     {
-        Menu menu({"Change algorithm settings","Change algorithm display settings","Start new run","Exit"},"Main Menu");
+        Menu menu({"Change algorithm settings","Change algorithm display settings","Start new run","Change selection mode","Exit"},"Main Menu");
         int boxselection=0;
         while(true)
         {
@@ -909,7 +1113,11 @@ class AlgorithmManager{
                 }
                 break;
             case 3:
-                return;
+                if(changeselectionmode()==-1)
+                {
+                    return;
+                }
+                break;
                 
             default:
                 return;
